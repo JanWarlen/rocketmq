@@ -331,6 +331,11 @@ public class MessageStoreConfig {
         this.deleteWhen = deleteWhen;
     }
 
+    /**
+     * 表示CommitLog/ConsumeQueue文件所在磁盘的最大使用量
+     * 超过该值则需要立即清除过期文件
+     * @return
+     */
     public int getDiskMaxUsedSpaceRatio() {
         if (this.diskMaxUsedSpaceRatio < 10)
             return 10;

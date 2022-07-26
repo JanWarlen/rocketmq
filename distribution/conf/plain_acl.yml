@@ -12,22 +12,36 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
+# 全局白名单
+#    空：不设置白名单
+#    *：表示全部匹配，阻断其他规则
+#    192.168.0.{100,101}：多地址配置
+#    192.168.1.100,192.168.2.100：多地址配置
+#    192.168.*.10-20：每个IP端使用 * 或 - 表示范围
 globalWhiteRemoteAddresses:
   - 10.10.103.*
   - 192.168.0.*
 
+# 配置账户信息
 accounts:
+#    登录用户名，长度必须大于6个字符
   - accessKey: RocketMQ
+#    登录密码，长度必须大于6个字符
     secretKey: 12345678
+#    账户级别的IP地址白名单，规则与 globalWhiteRemoteAddresses 相同，但只能配置一条
     whiteRemoteAddress:
+#    是否是超级管理员，true/false
     admin: false
+#    默认topic权限
     defaultTopicPerm: DENY
+#    默认消费组权限
     defaultGroupPerm: SUB
+#    设置topic的权限，针对指定topic，DENY 拒绝，PUB 发送权限，SUB 订阅权限
     topicPerms:
       - topicA=DENY
       - topicB=PUB|SUB
       - topicC=SUB
+#    针对指定消费组设置权限
     groupPerms:
       # the group should convert to retry topic
       - groupA=DENY

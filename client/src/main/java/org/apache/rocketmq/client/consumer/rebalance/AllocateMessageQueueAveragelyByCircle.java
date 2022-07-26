@@ -22,6 +22,14 @@ import org.apache.rocketmq.common.message.MessageQueue;
 
 /**
  * Cycle average Hashing queue algorithm
+ * 平均轮询分配
+ * 模拟：
+ * 队列：q1、q2、q3、q4、q5、q6、q7、q8
+ * 消费者: c1、c2、c3
+ * 分配结果:
+ * c1 : q1、q4、q7
+ * c2 : q2、q5、q8
+ * c3 : q3、q6
  */
 public class AllocateMessageQueueAveragelyByCircle extends AbstractAllocateMessageQueueStrategy {
 
@@ -33,10 +41,11 @@ public class AllocateMessageQueueAveragelyByCircle extends AbstractAllocateMessa
         if (!check(consumerGroup, currentCID, mqAll, cidAll)) {
             return result;
         }
-
+        // 当前消费者id所在集合顺序
         int index = cidAll.indexOf(currentCID);
         for (int i = index; i < mqAll.size(); i++) {
             if (i % cidAll.size() == index) {
+                // 按顺序分配
                 result.add(mqAll.get(i));
             }
         }

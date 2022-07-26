@@ -110,6 +110,20 @@ public class BrokerOuterAPI {
         this.remotingClient.updateNameServerAddressList(lst);
     }
 
+    /**
+     *
+     * @param clusterName 集群名称
+     * @param brokerAddr broker地址
+     * @param brokerName broker名称
+     * @param brokerId ID
+     * @param haServerAddr 主节点地址（初次请求为空），NameServer注册后返回从节点
+     * @param topicConfigWrapper 主题配置
+     * @param filterServerList 过滤
+     * @param oneway 是否是一次性（临时，只发送，不管返回结果）
+     * @param timeoutMills 超时时间
+     * @param compressed 压缩
+     * @return
+     */
     public List<RegisterBrokerResult> registerBrokerAll(
         final String clusterName,
         final String brokerAddr,
@@ -141,6 +155,7 @@ public class BrokerOuterAPI {
             final int bodyCrc32 = UtilAll.crc32(body);
             requestHeader.setBodyCrc32(bodyCrc32);
             final CountDownLatch countDownLatch = new CountDownLatch(nameServerAddressList.size());
+            // 遍历所有 NameServer 注册
             for (final String namesrvAddr : nameServerAddressList) {
                 brokerOuterExecutor.execute(() -> {
                     try {

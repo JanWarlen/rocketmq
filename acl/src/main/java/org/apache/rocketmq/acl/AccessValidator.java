@@ -29,7 +29,7 @@ public interface AccessValidator {
 
     /**
      * Parse to get the AccessResource(user, resource, needed permission)
-     *
+     * 从请求头中解析本次请求对应的访问资源，即本次请求需要的访问权限
      * @param request
      * @param remoteAddr
      * @return Plain access resource result,include access key,signature and some other access attributes.
@@ -38,14 +38,14 @@ public interface AccessValidator {
 
     /**
      * Validate the access resource.
-     *
+     * 根据本次需要访问的权限，与请求用户拥有的权限对比，判断用户是否拥有权限，如果没有则抛出异常，有则放行
      * @param accessResource
      */
     void validate(AccessResource accessResource);
 
     /**
      * Update the access resource config
-     *
+     * 更新 ACL 控制访问列表配置
      * @param plainAccessConfig
      * @return
      */
@@ -53,14 +53,14 @@ public interface AccessValidator {
 
     /**
      * Delete the access resource config
-     *
+     * 删除 ACL 控制访问列表配置
      * @return
      */
     boolean deleteAccessConfig(String accesskey);
 
     /**
      * Get the access resource config version information
-     *
+     * 获取当前 ACL 控制访问列表版本号
      * @return
      */
     @Deprecated
@@ -68,7 +68,7 @@ public interface AccessValidator {
 
     /**
      * Update globalWhiteRemoteAddresses in acl yaml config file
-     *
+     * 更新全局白名单IP列表
      * @return
      */
     boolean updateGlobalWhiteAddrsConfig(List<String> globalWhiteAddrsList);
@@ -77,7 +77,7 @@ public interface AccessValidator {
 
     /**
      * get broker cluster acl config information
-     *
+     * 获取 ACL 相关的配置信息
      * @return
      */
     AclConfig getAllAclConfig();

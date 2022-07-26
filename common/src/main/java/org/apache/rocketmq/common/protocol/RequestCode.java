@@ -19,13 +19,25 @@ package org.apache.rocketmq.common.protocol;
 
 public class RequestCode {
 
+    /**
+     * 发送消息
+     */
     public static final int SEND_MESSAGE = 10;
 
+    /**
+     * 消息拉取
+     */
     public static final int PULL_MESSAGE = 11;
 
+    /**
+     * 消息查询
+     */
     public static final int QUERY_MESSAGE = 12;
     public static final int QUERY_BROKER_OFFSET = 13;
     public static final int QUERY_CONSUMER_OFFSET = 14;
+    /**
+     * 更新消费进度
+     */
     public static final int UPDATE_CONSUMER_OFFSET = 15;
     public static final int UPDATE_AND_CREATE_TOPIC = 17;
     public static final int GET_ALL_TOPIC_CONFIG = 21;
@@ -48,13 +60,25 @@ public class RequestCode {
 
     public static final int VIEW_MESSAGE_BY_ID = 33;
 
+    /**
+     * 心跳
+     */
     public static final int HEART_BEAT = 34;
 
+    /**
+     * 取消注册
+     */
     public static final int UNREGISTER_CLIENT = 35;
 
+    /**
+     * 消费组重试发送消息
+     */
     public static final int CONSUMER_SEND_MSG_BACK = 36;
 
     public static final int END_TRANSACTION = 37;
+    /**
+     * 根据消费组获取消费者列表
+     */
     public static final int GET_CONSUMER_LIST_BY_GROUP = 38;
 
     public static final int CHECK_TRANSACTION_STATE = 39;
@@ -146,6 +170,9 @@ public class RequestCode {
     public static final int QUERY_CORRECTION_OFFSET = 308;
     public static final int CONSUME_MESSAGE_DIRECTLY = 309;
 
+    /**
+     * 发送第2版消息
+     */
     public static final int SEND_MESSAGE_V2 = 310;
 
     public static final int GET_UNIT_TOPIC_LIST = 311;

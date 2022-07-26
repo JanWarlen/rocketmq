@@ -18,38 +18,85 @@ package org.apache.rocketmq.acl.plain;
 
 import java.util.HashMap;
 import java.util.Map;
+
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.rocketmq.acl.AccessResource;
 import org.apache.rocketmq.common.MixAll;
 
+/**
+ * distribution/conf/plain_acl.yml/accounts
+ */
 public class PlainAccessResource implements AccessResource {
 
     // Identify the user
+    /**
+     * 用户名
+     */
     private String accessKey;
 
+    /**
+     * 用户密码
+     */
     private String secretKey;
 
+    /**
+     * 该用户的IP地址白名单
+     */
     private String whiteRemoteAddress;
 
+    /**
+     * 是否是超级管理员
+     */
     private boolean admin;
 
+    /**
+     * 未指定的topic默认访问权限
+     * 1=DENY
+     */
     private byte defaultTopicPerm = 1;
 
+    /**
+     * 消费组默认访问权限
+     * 1=DENY
+     */
     private byte defaultGroupPerm = 1;
 
+    /**
+     * 资源的访问权限列表
+     */
     private Map<String, Byte> resourcePermMap;
 
+    /**
+     * 远程IP地址验证策略
+     */
     private RemoteAddressStrategy remoteAddressStrategy;
 
+    /**
+     * 当前请求的requestCode
+     */
     private int requestCode;
 
     // The content to calculate the content
+    /**
+     * 请求头与请求体
+     */
     private byte[] content;
 
+    /**
+     * 签名字符串
+     * 在客户端，先将请求参数排序，然后使用 secretKey 生成签名字符串
+     * 在服务端，重复上述步骤，然后对比签名，如果不同则认证失败，相同则登录成功
+     */
     private String signature;
 
+    /**
+     * 密钥令牌
+     */
     private String secretToken;
 
+    /**
+     * 保留字段，未使用
+     */
     private String recognition;
 
     public PlainAccessResource() {

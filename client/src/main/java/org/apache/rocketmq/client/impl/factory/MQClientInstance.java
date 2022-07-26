@@ -237,8 +237,10 @@ public class MQClientInstance {
                     // Start various schedule tasks
                     this.startScheduledTask();
                     // Start pull service
+                    // 拉取消息线程
                     this.pullMessageService.start();
                     // Start rebalance service
+                    // 平衡线程
                     this.rebalanceService.start();
                     // Start push service
                     this.defaultMQProducer.getDefaultMQProducerImpl().start(false);
@@ -253,6 +255,14 @@ public class MQClientInstance {
         }
     }
 
+    /**
+     * 启动定时任务
+     * 囊括：获取NameServer地址（2分钟）
+     * 从NameServer获取topic路由信息（默认30s）
+     * 向Broker集群发送心跳（默认30s）
+     * 更新消费进度（默认5s）
+     * 消费线程池线程数量调整（1分钟）
+     */
     private void startScheduledTask() {
         if (null == this.clientConfig.getNamesrvAddr()) {
             this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
@@ -610,10 +620,13 @@ public class MQClientInstance {
                 try {
                     TopicRouteData topicRouteData;
                     if (isDefault && defaultMQProducer != null) {
+                        // 获取 TBW102 的路由信息
+                        // 用topic该配置配套给待创建的topic路由信息
                         topicRouteData = this.mQClientAPIImpl.getDefaultTopicRouteInfoFromNameServer(defaultMQProducer.getCreateTopicKey(),
                             clientConfig.getMqClientApiTimeout());
                         if (topicRouteData != null) {
                             for (QueueData data : topicRouteData.getQueueDatas()) {
+                                // 配置队列数
                                 int queueNums = Math.min(defaultMQProducer.getDefaultTopicQueueNums(), data.getReadQueueNums());
                                 data.setReadQueueNums(queueNums);
                                 data.setWriteQueueNums(queueNums);
@@ -1026,6 +1039,12 @@ public class MQClientInstance {
         return 0;
     }
 
+    /**
+     * 获取该topic该消费组的所有客户端id
+     * @param topic topic
+     * @param group 消费组
+     * @return 所有客户端id
+     */
     public List<String> findConsumerIdList(final String topic, final String group) {
         String brokerAddr = this.findBrokerAddrByTopic(topic);
         if (null == brokerAddr) {

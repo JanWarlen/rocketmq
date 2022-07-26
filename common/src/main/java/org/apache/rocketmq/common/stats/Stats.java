@@ -22,12 +22,33 @@ public class Stats {
     public static final String QUEUE_PUT_SIZE = "QUEUE_PUT_SIZE";
     public static final String QUEUE_GET_NUMS = "QUEUE_GET_NUMS";
     public static final String QUEUE_GET_SIZE = "QUEUE_GET_SIZE";
+    /**
+     * 以主题为维度统计消息写入数量
+     */
     public static final String TOPIC_PUT_NUMS = "TOPIC_PUT_NUMS";
+    /**
+     * 以主题为维度统计消息写入字节量
+     */
     public static final String TOPIC_PUT_SIZE = "TOPIC_PUT_SIZE";
+    /**
+     * 以消费组为维度统计消息获取条数
+     */
     public static final String GROUP_GET_NUMS = "GROUP_GET_NUMS";
+    /**
+     * 以消费组为维度统计消息获取字节数
+     */
     public static final String GROUP_GET_SIZE = "GROUP_GET_SIZE";
+    /**
+     * 以消费组为维度统计重试消息发送数量
+     */
     public static final String SNDBCK_PUT_NUMS = "SNDBCK_PUT_NUMS";
+    /**
+     * 以集群为维度统计消息写入条数
+     */
     public static final String BROKER_PUT_NUMS = "BROKER_PUT_NUMS";
+    /**
+     * 以集群为维度统计消息获取条数
+     */
     public static final String BROKER_GET_NUMS = "BROKER_GET_NUMS";
     public static final String GROUP_GET_FROM_DISK_NUMS = "GROUP_GET_FROM_DISK_NUMS";
     public static final String GROUP_GET_FROM_DISK_SIZE = "GROUP_GET_FROM_DISK_SIZE";
@@ -43,5 +64,8 @@ public class Stats {
 
     public static final String GROUP_GET_FALL_SIZE = "GROUP_GET_FALL_SIZE";
     public static final String GROUP_GET_FALL_TIME = "GROUP_GET_FALL_TIME";
+    /**
+     * 以消费组为统计维度统计消息拉取延迟时间
+     */
     public static final String GROUP_GET_LATENCY = "GROUP_GET_LATENCY";
 }

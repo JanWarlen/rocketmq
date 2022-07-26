@@ -290,6 +290,12 @@ public class AdminBrokerProcessor extends AsyncNettyRequestProcessor implements 
         RemotingCommand request) throws RemotingCommandException {
         final RemotingCommand response = RemotingCommand.createResponseCommand(null);
         if (validateSlave(response)) {
+            // TODO 有个bug，mqadmin deleteTopic 命令执行时始终失败，异常信息是这里返回的response
+            //  但是使用arthas监听broker方法的返回值，response 的code是0-SUCCESS
+            //  通过dashhboard 界面删除是正常的
+            //  问题在于执行delete命令时，tools那边时遍历了所有broker，因此slave也发送了执行命令
+            //  此时slave执行时出现异常response，导致topic无法删除
+            //  已经提交bug并且提交了bug修复的 pull request，已被采纳修复
             return response;
         }
         DeleteTopicRequestHeader requestHeader =

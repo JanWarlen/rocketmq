@@ -173,15 +173,18 @@ public abstract class AbstractSendMessageProcessor extends AsyncNettyRequestProc
         }
 
         if (!TopicValidator.validateTopic(requestHeader.getTopic(), response)) {
+            // topic 合法性校验
             return response;
         }
         if (TopicValidator.isNotAllowedSendTopic(requestHeader.getTopic(), response)) {
+            // 黑名单
             return response;
         }
 
         TopicConfig topicConfig =
             this.brokerController.getTopicConfigManager().selectTopicConfig(requestHeader.getTopic());
         if (null == topicConfig) {
+            // topic 不存在
             int topicSysFlag = 0;
             if (requestHeader.isUnitMode()) {
                 if (requestHeader.getTopic().startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX)) {
@@ -192,6 +195,7 @@ public abstract class AbstractSendMessageProcessor extends AsyncNettyRequestProc
             }
 
             log.warn("the topic {} not exist, producer: {}", requestHeader.getTopic(), ctx.channel().remoteAddress());
+            // 尝试创建topic
             topicConfig = this.brokerController.getTopicConfigManager().createTopicInSendMessageMethod(
                 requestHeader.getTopic(),
                 requestHeader.getDefaultTopic(),

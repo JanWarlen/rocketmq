@@ -30,23 +30,46 @@ import org.apache.rocketmq.common.constant.LoggerName;
 import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.logging.InternalLoggerFactory;
 
+/**
+ * MappedFile 管理类
+ * 队列
+ */
 public class MappedFileQueue {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
     private static final InternalLogger LOG_ERROR = InternalLoggerFactory.getLogger(LoggerName.STORE_ERROR_LOGGER_NAME);
 
     private static final int DELETE_FILES_BATCH_MAX = 10;
 
+    /**
+     * 存储目录
+     */
     private final String storePath;
-
+    /**
+     * 单个文件大小
+     */
     protected final int mappedFileSize;
 
+    /**
+     * 内存映射的文件集合
+     */
     protected final CopyOnWriteArrayList<MappedFile> mappedFiles = new CopyOnWriteArrayList<MappedFile>();
 
+    /**
+     * 创建文件服务
+     */
     private final AllocateMappedFileService allocateMappedFileService;
 
+    /**
+     * 当前刷盘偏移量指针
+     */
     protected long flushedWhere = 0;
+    /**
+     * 当前数据提交偏移量指针
+     */
     private long committedWhere = 0;
-
+    /**
+     * 最新存储消息时间戳
+     */
     private volatile long storeTimestamp = 0;
 
     public MappedFileQueue(final String storePath, int mappedFileSize,
@@ -75,6 +98,11 @@ public class MappedFileQueue {
         }
     }
 
+    /**
+     * 根据时间戳查找存储文件
+     * @param timestamp 时间戳
+     * @return 对应的CommitLog 文件
+     */
     public MappedFile getMappedFileByTime(final long timestamp) {
         Object[] mfs = this.copyMappedFiles(0);
 
@@ -84,6 +112,7 @@ public class MappedFileQueue {
         for (int i = 0; i < mfs.length; i++) {
             MappedFile mappedFile = (MappedFile) mfs[i];
             if (mappedFile.getLastModifiedTimestamp() >= timestamp) {
+                // 文件的最后修改时间戳不小于目标时间戳则表示该文件包含目标时间戳的消息
                 return mappedFile;
             }
         }
@@ -122,6 +151,10 @@ public class MappedFileQueue {
         this.deleteExpiredFile(willRemoveFiles);
     }
 
+    /**
+     * 删除过期文件内存对象
+     * @param files 过期文件
+     */
     void deleteExpiredFile(List<MappedFile> files) {
 
         if (!files.isEmpty()) {
@@ -155,12 +188,19 @@ public class MappedFileQueue {
         return true;
     }
 
+    /**
+     * 加载文件
+     * @param files
+     * @return
+     */
     public boolean doLoad(List<File> files) {
         // ascending order
+        // 将文件根据文件名生序排序（CommitLog文件名是已文件的起始物理偏移量命名）
         files.sort(Comparator.comparing(File::getName));
 
         for (File file : files) {
             if (file.length() != this.mappedFileSize) {
+                // 文件的大小和配置的文件限制大小不同，需要人工确认
                 log.warn(file + "\t" + file.length()
                         + " length not matched message store config value, please check it manually");
                 return false;
@@ -168,10 +208,12 @@ public class MappedFileQueue {
 
             try {
                 MappedFile mappedFile = new MappedFile(file.getPath(), mappedFileSize);
-
+                // 指针全部指向文件结尾
+                // 会在后续的 recover 中恢复指针的正确指向
                 mappedFile.setWrotePosition(this.mappedFileSize);
                 mappedFile.setFlushedPosition(this.mappedFileSize);
                 mappedFile.setCommittedPosition(this.mappedFileSize);
+                // 文件放入队列中
                 this.mappedFiles.add(mappedFile);
                 log.info("load " + file.getPath() + " OK");
             } catch (IOException e) {
@@ -197,6 +239,12 @@ public class MappedFileQueue {
         return 0;
     }
 
+    /**
+     * 获取最新的内存映射文件
+     * @param startOffset 起始偏移量
+     * @param needCreate 是否需要创建文件
+     * @return
+     */
     public MappedFile getLastMappedFile(final long startOffset, boolean needCreate) {
         long createOffset = -1;
         MappedFile mappedFileLast = getLastMappedFile();
@@ -206,6 +254,7 @@ public class MappedFileQueue {
         }
 
         if (mappedFileLast != null && mappedFileLast.isFull()) {
+            // 即便是通过 startOffset=0 尝试创建文件，此处也会将偏移量调整到最新
             createOffset = mappedFileLast.getFileFromOffset() + this.mappedFileSize;
         }
 
@@ -216,6 +265,11 @@ public class MappedFileQueue {
         return mappedFileLast;
     }
 
+    /**
+     * 尝试创建文件
+     * @param createOffset 文件起始偏移量（文件名）
+     * @return
+     */
     protected MappedFile tryCreateMappedFile(long createOffset) {
         String nextFilePath = this.storePath + File.separator + UtilAll.offset2FileName(createOffset);
         String nextNextFilePath = this.storePath + File.separator + UtilAll.offset2FileName(createOffset
@@ -347,6 +401,14 @@ public class MappedFileQueue {
         }
     }
 
+    /**
+     * 根据时间删除过期文件
+     * @param expiredTime 文件生存时间
+     * @param deleteFilesInterval 删除文件间隔
+     * @param intervalForcibly
+     * @param cleanImmediately 是否立即清理
+     * @return
+     */
     public int deleteExpiredFileByTime(final long expiredTime,
         final int deleteFilesInterval,
         final long intervalForcibly,
@@ -364,6 +426,7 @@ public class MappedFileQueue {
                 MappedFile mappedFile = (MappedFile) mfs[i];
                 long liveMaxTimestamp = mappedFile.getLastModifiedTimestamp() + expiredTime;
                 if (System.currentTimeMillis() >= liveMaxTimestamp || cleanImmediately) {
+                    // 文件物理删除
                     if (mappedFile.destroy(intervalForcibly)) {
                         files.add(mappedFile);
                         deleteCount++;
@@ -393,6 +456,13 @@ public class MappedFileQueue {
         return deleteCount;
     }
 
+    /**
+     * 仅删除文件中记录最大偏移量小于 offset 的文件
+     * 即所有位点（偏移量）均已被删除
+     * @param offset 此时 CommitLog 的最小偏移量
+     * @param unitSize CQ_STORE_UNIT_SIZE
+     * @return
+     */
     public int deleteExpiredFileByOffset(long offset, int unitSize) {
         Object[] mfs = this.copyMappedFiles(0);
 
@@ -405,10 +475,12 @@ public class MappedFileQueue {
             for (int i = 0; i < mfsLength; i++) {
                 boolean destroy;
                 MappedFile mappedFile = (MappedFile) mfs[i];
+                // this.mappedFileSize - unitSize 文件最大可写入空间
                 SelectMappedBufferResult result = mappedFile.selectMappedBuffer(this.mappedFileSize - unitSize);
                 if (result != null) {
                     long maxOffsetInLogicQueue = result.getByteBuffer().getLong();
                     result.release();
+                    // 判定当前文件记录的最大偏移量是否小于当前最小偏移量
                     destroy = maxOffsetInLogicQueue < offset;
                     if (destroy) {
                         log.info("physic min offset " + offset + ", logics in current mappedFile max offset "
@@ -441,11 +513,14 @@ public class MappedFileQueue {
         MappedFile mappedFile = this.findMappedFileByOffset(this.flushedWhere, this.flushedWhere == 0);
         if (mappedFile != null) {
             long tmpTimeStamp = mappedFile.getStoreTimestamp();
+            // 刷盘，返回的是最新刷盘偏移量
             int offset = mappedFile.flush(flushLeastPages);
             long where = mappedFile.getFileFromOffset() + offset;
             result = where == this.flushedWhere;
+            // 更新刷盘偏移量指针
             this.flushedWhere = where;
             if (0 == flushLeastPages) {
+                // 更新存储时间
                 this.storeTimestamp = tmpTimeStamp;
             }
         }
@@ -455,11 +530,14 @@ public class MappedFileQueue {
 
     public boolean commit(final int commitLeastPages) {
         boolean result = true;
+        // 找到对应 mappedFile
         MappedFile mappedFile = this.findMappedFileByOffset(this.committedWhere, this.committedWhere == 0);
         if (mappedFile != null) {
             int offset = mappedFile.commit(commitLeastPages);
             long where = mappedFile.getFileFromOffset() + offset;
+            // 如果有数据commit了，则where != this.committedWhere
             result = where == this.committedWhere;
+            // 更新已提交偏移量
             this.committedWhere = where;
         }
 

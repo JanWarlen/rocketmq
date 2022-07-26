@@ -35,6 +35,9 @@ public class Validators {
 
     /**
      * Validate group
+     * 消费组不为空
+     * 消费组长度不超过255
+     * 消费组是否含有非法字符
      */
     public static void checkGroup(String group) throws MQClientException {
         if (UtilAll.isBlank(group)) {

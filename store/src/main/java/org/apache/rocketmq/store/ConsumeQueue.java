@@ -44,6 +44,9 @@ public class ConsumeQueue {
 
     private final String storePath;
     private final int mappedFileSize;
+    /**
+     * CommitLog文件的最大物理偏移量
+     */
     private long maxPhysicOffset = -1;
     private volatile long minLogicOffset = 0;
     private ConsumeQueueExt consumeQueueExt = null;
@@ -111,6 +114,7 @@ public class ConsumeQueue {
 
                     if (offset >= 0 && size > 0) {
                         mappedFileOffset = i + CQ_STORE_UNIT_SIZE;
+                        // TODO 初步推断是存储的CommitLog文件的最大物理偏移量
                         this.maxPhysicOffset = offset + size;
                         if (isExtAddr(tagsCode)) {
                             maxExtAddr = tagsCode;
@@ -142,10 +146,13 @@ public class ConsumeQueue {
                     break;
                 }
             }
-
+            // 偏移量调整到最大偏移量
             processOffset += mappedFileOffset;
+            // 刷盘起始偏移量
             this.mappedFileQueue.setFlushedWhere(processOffset);
+            // 提交起始偏移量
             this.mappedFileQueue.setCommittedWhere(processOffset);
+            // 截断文件起始偏移量
             this.mappedFileQueue.truncateDirtyFiles(processOffset);
 
             if (isExtReadEnable()) {
@@ -334,6 +341,11 @@ public class ConsumeQueue {
         return result;
     }
 
+    /**
+     *
+     * @param offset 此时 CommitLog 的最小偏移量
+     * @return
+     */
     public int deleteExpiredFile(long offset) {
         int cnt = this.mappedFileQueue.deleteExpiredFileByOffset(offset, CQ_STORE_UNIT_SIZE);
         this.correctMinOffset(offset);

@@ -17,15 +17,45 @@
 package org.apache.rocketmq.remoting.netty;
 
 public class NettyServerConfig implements Cloneable {
+    /**
+     * NameServer 监听端口，默认9876
+     */
     private int listenPort = 8888;
+    /**
+     * Netty 业务线程池线程个数
+     */
     private int serverWorkerThreads = 8;
+    /**
+     * Netty 公用任务线程池个数，该属性未被赋值，在使用时有判断是否赋值，未赋值则使用 4 初始化公用任务线程池
+     * 未注册线程池的业务类型使用公用任务线程池执行
+     */
     private int serverCallbackExecutorThreads = 0;
+    /**
+     * I/O 线程池线程数
+     * 用于处理网络请求，解析请求，转发到注册线程池，返回结果
+     */
     private int serverSelectorThreads = 3;
+    /**
+     * send oneway 消息请求的并发度（broker）
+     */
     private int serverOnewaySemaphoreValue = 256;
+    /**
+     * 异步消息发送的最大并发度（broker）
+     */
     private int serverAsyncSemaphoreValue = 64;
+    /**
+     * 网络连接最大空闲时间，默认 120s
+     * 空闲时间超过该值，将会被关闭
+     */
     private int serverChannelMaxIdleTimeSeconds = 120;
 
+    /**
+     * socket 发送缓存区大小，默认64KB
+     */
     private int serverSocketSndBufSize = NettySystemConfig.socketSndbufSize;
+    /**
+     * socket 接收缓存区大小，默认64KB
+     */
     private int serverSocketRcvBufSize = NettySystemConfig.socketRcvbufSize;
     private int writeBufferHighWaterMark = NettySystemConfig.writeBufferHighWaterMark;
     private int writeBufferLowWaterMark = NettySystemConfig.writeBufferLowWaterMark;
@@ -38,6 +68,7 @@ public class NettyServerConfig implements Cloneable {
      *
      * ../glibc-2.10.1/configure \ --prefix=/usr \ --with-headers=/usr/include \
      * --host=x86_64-linux-gnu \ --build=x86_64-pc-linux-gnu \ --without-gd
+     * 是否启用 epoll，linux中建议开启
      */
     private boolean useEpollNativeSelector = false;
 

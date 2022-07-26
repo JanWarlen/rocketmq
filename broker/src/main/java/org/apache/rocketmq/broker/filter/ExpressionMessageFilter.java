@@ -83,11 +83,13 @@ public class ExpressionMessageFilter implements MessageFilter {
             // no expression or no bloom
             if (consumerFilterData == null || consumerFilterData.getExpression() == null
                 || consumerFilterData.getCompiledExpression() == null || consumerFilterData.getBloomFilterData() == null) {
+                // 未设置表达式，全部匹配
                 return true;
             }
 
             // message is before consumer
             if (cqExtUnit == null || !consumerFilterData.isMsgInLive(cqExtUnit.getMsgStoreTime())) {
+                // TODO 意义不明，
                 log.debug("Pull matched because not in live: {}, {}", consumerFilterData, cqExtUnit);
                 return true;
             }
@@ -134,17 +136,19 @@ public class ExpressionMessageFilter implements MessageFilter {
         // no expression
         if (realFilterData == null || realFilterData.getExpression() == null
             || realFilterData.getCompiledExpression() == null) {
+            // 无表达式，直接匹配
             return true;
         }
 
         if (tempProperties == null && msgBuffer != null) {
+            // 入参未传递属性，此处重新获取
             tempProperties = MessageDecoder.decodeProperties(msgBuffer);
         }
 
         Object ret = null;
         try {
             MessageEvaluationContext context = new MessageEvaluationContext(tempProperties);
-
+            // 匹配消息
             ret = realFilterData.getCompiledExpression().evaluate(context);
         } catch (Throwable e) {
             log.error("Message Filter error, " + realFilterData + ", " + tempProperties, e);

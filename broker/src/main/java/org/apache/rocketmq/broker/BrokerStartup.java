@@ -86,6 +86,10 @@ public class BrokerStartup {
         }
     }
 
+    /**
+     * 构建并初始化BrokerController
+     * 囊括了文件的加载和校验
+     */
     public static BrokerController createBrokerController(String[] args) {
         System.setProperty(RemotingCommand.REMOTING_VERSION_KEY, Integer.toString(MQVersion.CURRENT_VERSION));
 
@@ -216,7 +220,7 @@ public class BrokerStartup {
                 messageStoreConfig);
             // remember all configs to prevent discard
             controller.getConfiguration().registerConfig(properties);
-
+            // 启动前的初始化，包含了存储文件的加载
             boolean initResult = controller.initialize();
             if (!initResult) {
                 controller.shutdown();

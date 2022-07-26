@@ -43,10 +43,13 @@ public abstract class ReferenceResource {
     public void shutdown(final long intervalForcibly) {
         if (this.available) {
             this.available = false;
+            // 记录第一次尝试删除时间戳
             this.firstShutdownTimestamp = System.currentTimeMillis();
+            // 释放占用
             this.release();
         } else if (this.getRefCount() > 0) {
             if ((System.currentTimeMillis() - this.firstShutdownTimestamp) >= intervalForcibly) {
+                // 超过最大留存时间，直接强制清理
                 this.refCount.set(-1000 - this.getRefCount());
                 this.release();
             }

@@ -62,6 +62,7 @@ public class PlainAccessValidator implements AccessValidator {
         accessResource.setRequestCode(request.getCode());
 
         if (request.getExtFields() == null) {
+            // 消息发送会将acl相关参数写入extFields，如果为空就没必要继续找了
             // If request's extFields is null,then return accessResource directly(users can use whiteAddress pattern)
             // The following logic codes depend on the request's extFields not to be null.
             return accessResource;
@@ -73,6 +74,7 @@ public class PlainAccessValidator implements AccessValidator {
         try {
             switch (request.getCode()) {
                 case RequestCode.SEND_MESSAGE:
+                    // 消息写入broker
                     final String topic = request.getExtFields().get("topic");
                     if (PlainAccessResource.isRetryTopic(topic)) {
                         accessResource.addResourceAndPerm(getRetryTopic(request.getExtFields().get("group")), Permission.SUB);
@@ -81,6 +83,7 @@ public class PlainAccessValidator implements AccessValidator {
                     }
                     break;
                 case RequestCode.SEND_MESSAGE_V2:
+                    // 消息写入broker
                     final String topicV2 = request.getExtFields().get("b");
                     if (PlainAccessResource.isRetryTopic(topicV2)) {
                         accessResource.addResourceAndPerm(getRetryTopic(request.getExtFields().get("a")), Permission.SUB);
@@ -89,16 +92,20 @@ public class PlainAccessValidator implements AccessValidator {
                     }
                     break;
                 case RequestCode.CONSUMER_SEND_MSG_BACK:
+                    // 消费失败回传
                     accessResource.addResourceAndPerm(getRetryTopic(request.getExtFields().get("group")), Permission.SUB);
                     break;
                 case RequestCode.PULL_MESSAGE:
+                    // 拉取消息
                     accessResource.addResourceAndPerm(request.getExtFields().get("topic"), Permission.SUB);
                     accessResource.addResourceAndPerm(getRetryTopic(request.getExtFields().get("consumerGroup")), Permission.SUB);
                     break;
                 case RequestCode.QUERY_MESSAGE:
+                    // 消息查询
                     accessResource.addResourceAndPerm(request.getExtFields().get("topic"), Permission.SUB);
                     break;
                 case RequestCode.HEART_BEAT:
+                    // 心跳
                     HeartbeatData heartbeatData = HeartbeatData.decode(request.getBody(), HeartbeatData.class);
                     for (ConsumerData data : heartbeatData.getConsumerDataSet()) {
                         accessResource.addResourceAndPerm(getRetryTopic(data.getGroupName()), Permission.SUB);
@@ -108,18 +115,21 @@ public class PlainAccessValidator implements AccessValidator {
                     }
                     break;
                 case RequestCode.UNREGISTER_CLIENT:
+                    // 卸载client
                     final UnregisterClientRequestHeader unregisterClientRequestHeader =
                         (UnregisterClientRequestHeader) request
                             .decodeCommandCustomHeader(UnregisterClientRequestHeader.class);
                     accessResource.addResourceAndPerm(getRetryTopic(unregisterClientRequestHeader.getConsumerGroup()), Permission.SUB);
                     break;
                 case RequestCode.GET_CONSUMER_LIST_BY_GROUP:
+                    // 查询所有消费者
                     final GetConsumerListByGroupRequestHeader getConsumerListByGroupRequestHeader =
                         (GetConsumerListByGroupRequestHeader) request
                             .decodeCommandCustomHeader(GetConsumerListByGroupRequestHeader.class);
                     accessResource.addResourceAndPerm(getRetryTopic(getConsumerListByGroupRequestHeader.getConsumerGroup()), Permission.SUB);
                     break;
                 case RequestCode.UPDATE_CONSUMER_OFFSET:
+                    // 更新消费进度
                     final UpdateConsumerOffsetRequestHeader updateConsumerOffsetRequestHeader =
                         (UpdateConsumerOffsetRequestHeader) request
                             .decodeCommandCustomHeader(UpdateConsumerOffsetRequestHeader.class);

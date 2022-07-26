@@ -98,6 +98,9 @@ public class AclClient {
         consumer.start();
         System.out.printf("Consumer Started.%n");
     }
+    static RPCHook getAclRPCHook() {
+        return new AclClientRPCHook(new SessionCredentials(ACL_ACCESS_KEY,ACL_SECRET_KEY));
+    }
 
     public static void pullConsumer() throws MQClientException {
         DefaultMQPullConsumer consumer = new DefaultMQPullConsumer("please_rename_unique_group_name_6", getAclRPCHook());
@@ -162,7 +165,4 @@ public class AclClient {
         OFFSE_TABLE.put(mq, offset);
     }
 
-    static RPCHook getAclRPCHook() {
-        return new AclClientRPCHook(new SessionCredentials(ACL_ACCESS_KEY,ACL_SECRET_KEY));
-    }
 }

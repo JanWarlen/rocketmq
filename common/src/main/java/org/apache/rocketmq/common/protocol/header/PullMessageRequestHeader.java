@@ -37,6 +37,9 @@ public class PullMessageRequestHeader implements CommandCustomHeader, FastCodesH
     private String topic;
     @CFNotNull
     private Integer queueId;
+    /**
+     * 拉取的起始offset
+     */
     @CFNotNull
     private Long queueOffset;
     @CFNotNull

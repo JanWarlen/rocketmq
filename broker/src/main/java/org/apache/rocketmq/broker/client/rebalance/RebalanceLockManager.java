@@ -35,6 +35,13 @@ public class RebalanceLockManager {
     private final ConcurrentMap<String/* group */, ConcurrentHashMap<MessageQueue, LockEntry>> mqLockTable =
         new ConcurrentHashMap<String, ConcurrentHashMap<MessageQueue, LockEntry>>(1024);
 
+    /**
+     * 申请对mqs消息消费队列加锁
+     * @param group 消费组名
+     * @param mq 消费队列
+     * @param clientId 消费者id
+     * @return 是否成功
+     */
     public boolean tryLock(final String group, final MessageQueue mq, final String clientId) {
 
         if (!this.isLocked(group, mq, clientId)) {
@@ -104,6 +111,7 @@ public class RebalanceLockManager {
             if (lockEntry != null) {
                 boolean locked = lockEntry.isLocked(clientId);
                 if (locked) {
+                    // 已经拥有的锁，成功再次获取后，此时都更新锁时间戳，防止过期
                     lockEntry.setLastUpdateTimestamp(System.currentTimeMillis());
                 }
 
@@ -114,15 +122,24 @@ public class RebalanceLockManager {
         return false;
     }
 
+    /**
+     *
+     * @param group 消费组名
+     * @param mqs 消费队列集合
+     * @param clientId 消费者id
+     * @return 成功加锁的消息队列集合
+     */
     public Set<MessageQueue> tryLockBatch(final String group, final Set<MessageQueue> mqs,
         final String clientId) {
         Set<MessageQueue> lockedMqs = new HashSet<MessageQueue>(mqs.size());
         Set<MessageQueue> notLockedMqs = new HashSet<MessageQueue>(mqs.size());
 
         for (MessageQueue mq : mqs) {
+            // 对已拥有的锁更新锁时间戳
             if (this.isLocked(group, mq, clientId)) {
                 lockedMqs.add(mq);
             } else {
+                // 没锁住的队列集合
                 notLockedMqs.add(mq);
             }
         }
@@ -133,6 +150,7 @@ public class RebalanceLockManager {
                 try {
                     ConcurrentHashMap<MessageQueue, LockEntry> groupValue = this.mqLockTable.get(group);
                     if (null == groupValue) {
+                        // 第一期启动，此时内存中还没有维护对应的数据
                         groupValue = new ConcurrentHashMap<>(32);
                         this.mqLockTable.put(group, groupValue);
                     }
@@ -140,7 +158,9 @@ public class RebalanceLockManager {
                     for (MessageQueue mq : notLockedMqs) {
                         LockEntry lockEntry = groupValue.get(mq);
                         if (null == lockEntry) {
+                            // 该队列还没有被申请过锁（broker第一次启动 or 消费者第一次启动）
                             lockEntry = new LockEntry();
+                            // 当前申请的消费者可以获取该队列锁
                             lockEntry.setClientId(clientId);
                             groupValue.put(mq, lockEntry);
                             log.info(
@@ -189,6 +209,12 @@ public class RebalanceLockManager {
         return lockedMqs;
     }
 
+    /**
+     * 申请对消费队列集合解锁
+     * @param group 消费组名
+     * @param mqs 消费队列集合
+     * @param clientId 持有锁的消费者id
+     */
     public void unlockBatch(final String group, final Set<MessageQueue> mqs, final String clientId) {
         try {
             this.lock.lockInterruptibly();

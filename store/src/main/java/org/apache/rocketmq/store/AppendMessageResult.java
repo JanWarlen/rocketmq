@@ -23,20 +23,34 @@ import java.util.function.Supplier;
  */
 public class AppendMessageResult {
     // Return code
+    // 消息追加结果
     private AppendMessageStatus status;
     // Where to start writing
+    // 消息的物理偏移量
     private long wroteOffset;
     // Write Bytes
+    // 写入内容大小
     private int wroteBytes;
     // Message ID
+    // 消息ID
     private String msgId;
     private Supplier<String> msgIdSupplier;
     // Message storage timestamp
+    // 消息存储时间戳
     private long storeTimestamp;
     // Consume queue's offset(step by one)
+    /**
+     * 消息消费队列的逻辑偏移量
+     */
     private long logicsOffset;
+    /**
+     * 写入页缓存的响应时间
+     */
     private long pagecacheRT = 0;
 
+    /**
+     * 批量发送消息是的消息条数
+     */
     private int msgNum = 1;
 
     public AppendMessageResult(AppendMessageStatus status) {

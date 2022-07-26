@@ -159,6 +159,10 @@ public class StoreStatsService extends ServiceThread {
         return putMessageEntireTimeMax;
     }
 
+    /**
+     * 根据耗时，在不同的耗时区间增加统计次数
+     * @param value
+     */
     public void setPutMessageEntireTimeMax(long value) {
         this.incPutMessageEntireTime(value);
         final LongAdder[] times = this.putMessageDistributeTime;

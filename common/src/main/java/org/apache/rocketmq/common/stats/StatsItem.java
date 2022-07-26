@@ -25,19 +25,47 @@ import java.util.concurrent.atomic.LongAdder;
 import org.apache.rocketmq.common.UtilAll;
 import org.apache.rocketmq.logging.InternalLogger;
 
+/**
+ * 具体统计数据载体
+ */
 public class StatsItem {
 
+    /**
+     * 当前统计的值
+     */
     private final LongAdder value = new LongAdder();
 
+    /**
+     * 当前 value 变化的次数
+     */
     private final LongAdder times = new LongAdder();
 
+    /**
+     * 1分钟内的调用快照信息，10s采集一次
+     * org.apache.rocketmq.common.stats.StatsItem#samplingInSeconds() 中限制了大小不超过7
+     */
     private final LinkedList<CallSnapshot> csListMinute = new LinkedList<CallSnapshot>();
 
+    /**
+     * 1小时内调用快照信息，10分钟采集一次
+     * org.apache.rocketmq.common.stats.StatsItem#samplingInMinutes() 中限制了大小不超过7
+     */
     private final LinkedList<CallSnapshot> csListHour = new LinkedList<CallSnapshot>();
 
+    /**
+     * 1天内调用快照信息，1小时采集一次
+     * org.apache.rocketmq.common.stats.StatsItem#samplingInHour() 限制大小不超过25
+     */
     private final LinkedList<CallSnapshot> csListDay = new LinkedList<CallSnapshot>();
 
+    /**
+     * 统计项名称
+     */
     private final String statsName;
+    /**
+     * 统计项 keu
+     * 如果统计的是topic的写入数量，则该值为每一个具体的topic
+     */
     private final String statsKey;
     private final ScheduledExecutorService scheduledExecutorService;
     private final InternalLogger log;
@@ -233,9 +261,18 @@ public class StatsItem {
 }
 
 class CallSnapshot {
+    /**
+     * 快照生成时间戳
+     */
     private final long timestamp;
+    /**
+     * 快照生成时，value发生变化次数
+     */
     private final long times;
 
+    /**
+     * 快照生成时，当前统计数量
+     */
     private final long value;
 
     public CallSnapshot(long timestamp, long times, long value) {

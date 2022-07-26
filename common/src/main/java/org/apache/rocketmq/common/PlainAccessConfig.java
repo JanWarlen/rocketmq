@@ -20,20 +20,50 @@ import java.util.List;
 
 public class PlainAccessConfig {
 
+    /**
+     * 登录用户名
+     */
     private String accessKey;
 
+    /**
+     * 登录密码
+     */
     private String secretKey;
 
+    /**
+     * 账户级别的IP地址白名单，但只能配置一条
+     */
     private String whiteRemoteAddress;
 
+    /**
+     * 是否是超级管理员，true/false
+     */
     private boolean admin;
 
+    /**
+     * 默认topic权限
+     */
     private String defaultTopicPerm;
 
+    /**
+     * 默认消费组权限
+     */
     private String defaultGroupPerm;
 
+    /**
+     * 设置指定topic的权限，针对指定topic，DENY 拒绝，PUB 发送权限，SUB 订阅权限
+     * topicA=DENY
+     * topicB=PUB|SUB
+     * topicC=SUB
+     */
     private List<String> topicPerms;
 
+    /**
+     * 针对指定消费组设置权限
+     * groupA=DENY
+     * groupB=PUB|SUB
+     * groupC=SUB
+     */
     private List<String> groupPerms;
 
     public String getAccessKey() {

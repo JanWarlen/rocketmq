@@ -23,6 +23,8 @@ import org.apache.rocketmq.common.message.MessageQueue;
 
 /**
  * Computer room Hashing queue algorithm, such as Alipay logic room
+ * 根据Broker部署机房名，对每个消费者负责不同的Broker上的队列
+ * 和平均分配类似，就是多了一个机房筛选的步骤
  */
 public class AllocateMessageQueueByMachineRoom extends AbstractAllocateMessageQueueStrategy {
     private Set<String> consumeridcs;
@@ -39,6 +41,7 @@ public class AllocateMessageQueueByMachineRoom extends AbstractAllocateMessageQu
         if (currentIndex < 0) {
             return result;
         }
+        // 筛选出当前消费者对应机房的队列
         List<MessageQueue> premqAll = new ArrayList<MessageQueue>();
         for (MessageQueue mq : mqAll) {
             String[] temp = mq.getBrokerName().split("@");
@@ -55,6 +58,7 @@ public class AllocateMessageQueueByMachineRoom extends AbstractAllocateMessageQu
             result.add(premqAll.get(i));
         }
         if (rem > currentIndex) {
+            // 在余数范围内，额外+1个
             result.add(premqAll.get(currentIndex + mod * cidAll.size()));
         }
         return result;

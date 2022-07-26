@@ -74,18 +74,18 @@ public class NamesrvController {
     }
 
     public boolean initialize() {
-
+        // 加载 KV 配置
         this.kvConfigManager.load();
-
+        // 创建网络处理对象
         this.remotingServer = new NettyRemotingServer(this.nettyServerConfig, this.brokerHousekeepingService);
 
         this.remotingExecutor =
             Executors.newFixedThreadPool(nettyServerConfig.getServerWorkerThreads(), new ThreadFactoryImpl("RemotingExecutorThread_"));
 
         this.registerProcessor();
-
+        // 每10s扫描 过期broker
         this.scheduledExecutorService.scheduleAtFixedRate(NamesrvController.this.routeInfoManager::scanNotActiveBroker, 5, 10, TimeUnit.SECONDS);
-
+        // 每10s 打印一次 KV 配置
         this.scheduledExecutorService.scheduleAtFixedRate(NamesrvController.this.kvConfigManager::printAllPeriodically, 1, 10, TimeUnit.MINUTES);
 
         if (TlsSystemConfig.tlsMode != TlsMode.DISABLED) {
@@ -129,6 +129,9 @@ public class NamesrvController {
         return true;
     }
 
+    /**
+     * 注册请求处理器和请求处理线程池
+     */
     private void registerProcessor() {
         if (namesrvConfig.isClusterTest()) {
 

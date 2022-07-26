@@ -31,7 +31,7 @@ public class Producer {
         for (int i = 0; i < 128; i++)
             try {
                 {
-                    Message msg = new Message("TopicTest",
+                    Message msg = new Message("TopicTest22",
                         "TagA",
                         "OrderID188",
                         "Hello world".getBytes(RemotingHelper.DEFAULT_CHARSET));

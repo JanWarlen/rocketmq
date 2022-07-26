@@ -22,6 +22,14 @@ import org.apache.rocketmq.common.message.MessageQueue;
 
 /**
  * Average Hashing queue algorithm
+ * 平均分配
+ * 模拟：
+ * 队列：q1、q2、q3、q4、q5、q6、q7、q8
+ * 消费者: c1、c2、c3
+ * 分配结果:
+ * c1 : q1、q2、q3
+ * c2 : q4、q5、q6
+ * c3 : q7、q8
  */
 public class AllocateMessageQueueAveragely extends AbstractAllocateMessageQueueStrategy {
 
@@ -33,14 +41,19 @@ public class AllocateMessageQueueAveragely extends AbstractAllocateMessageQueueS
         if (!check(consumerGroup, currentCID, mqAll, cidAll)) {
             return result;
         }
-
+        // 当前消费者在第几个
         int index = cidAll.indexOf(currentCID);
+        // 取余
         int mod = mqAll.size() % cidAll.size();
+        // 如果队列数量小于消费者数量，则分配1个
+        // 如果有余数并且当前消费者的顺序（index从0开始）小于余数，则分配 （队列数/消费者数 + 1），否则分配 队列数/消费者数
         int averageSize =
             mqAll.size() <= cidAll.size() ? 1 : (mod > 0 && index < mod ? mqAll.size() / cidAll.size()
                 + 1 : mqAll.size() / cidAll.size());
+        // 如果有余数并且当前消费者的顺序（index从0开始）小于余数，则起始是 index * averageSize，否则是 index * averageSize + mod
         int startIndex = (mod > 0 && index < mod) ? index * averageSize : index * averageSize + mod;
         int range = Math.min(averageSize, mqAll.size() - startIndex);
+        // 统计分配结果
         for (int i = 0; i < range; i++) {
             result.add(mqAll.get((startIndex + i) % mqAll.size()));
         }

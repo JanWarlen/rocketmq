@@ -26,6 +26,19 @@ import org.apache.rocketmq.common.message.MessageQueue;
 
 /**
  * Consistent Hashing queue algorithm
+ * 一致性hash,该算法会将consumer的hash值作为Node节点存放到hash环上，然后将queue的hash值也放到hash环 上，通过顺时针方向，距离queue最近的那个consumer就是该queue要分配的consumer
+ * 不推荐使用
+ *  模拟：
+ *  hash环：c1、q1、q2、q3
+ *         q10        c2
+ *         q9         q4
+ *         c4         c3
+ *         q8、q7、q6、q5
+ * 分配结果：
+ * c1 : q9、q10
+ * c2 : q1、q2、q3
+ * c3 : q4
+ * c4 : q5、q6、q7、q8
  */
 public class AllocateMessageQueueConsistentHash extends AbstractAllocateMessageQueueStrategy {
 

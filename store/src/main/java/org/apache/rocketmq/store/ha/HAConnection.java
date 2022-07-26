@@ -29,15 +29,38 @@ import org.apache.rocketmq.remoting.common.RemotingUtil;
 import org.apache.rocketmq.remoting.netty.NettySystemConfig;
 import org.apache.rocketmq.store.SelectMappedBufferResult;
 
+/**
+ * HA主服务器高可用连接对象的封装
+ * 主节点收到从节点的连接请求后，会将连接 SocketChannel 封装成 HAConnection
+ * 也是 Broker 服务器的网络读写实现类
+ */
 public class HAConnection {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
     private final HAService haService;
+    /**
+     * 网络传输通道
+     */
     private final SocketChannel socketChannel;
+    /**
+     * 客户端连接地址
+     */
     private final String clientAddr;
+    /**
+     * 服务端向从服务器写数据服务类
+     */
     private final WriteSocketService writeSocketService;
+    /**
+     * 服务端向从服务器读数据服务类
+     */
     private final ReadSocketService readSocketService;
 
+    /**
+     * 从服务器请求拉取消息的偏移量
+     */
     private volatile long slaveRequestOffset = -1;
+    /**
+     * 从服务器反馈已拉取完成的消息偏移量
+     */
     private volatile long slaveAckOffset = -1;
 
     public HAConnection(final HAService haService, final SocketChannel socketChannel) throws IOException {
@@ -99,12 +122,33 @@ public class HAConnection {
         log.info(serviceName + " service end");
     }
 
+    /**
+     * 高可用主节点网络读实现类
+     */
     class ReadSocketService extends ServiceThread {
+        /**
+         * 网络读缓存区大小，默认 1MB
+         */
         private static final int READ_MAX_BUFFER_SIZE = 1024 * 1024;
+        /**
+         * NIO 事件选择器
+         */
         private final Selector selector;
+        /**
+         * 网络传输通道
+         */
         private final SocketChannel socketChannel;
+        /**
+         * 网络读写缓存区，默认 1MB
+         */
         private final ByteBuffer byteBufferRead = ByteBuffer.allocate(READ_MAX_BUFFER_SIZE);
+        /**
+         * byteBuffer 当前处理指针
+         */
         private int processPosition = 0;
+        /**
+         * 上次读取数据的时间戳
+         */
         private volatile long lastReadTimestamp = System.currentTimeMillis();
 
         public ReadSocketService(final SocketChannel socketChannel) throws IOException {
@@ -120,6 +164,7 @@ public class HAConnection {
 
             while (!this.isStopped()) {
                 try {
+                    // 事件选择
                     this.selector.select(1000);
                     boolean ok = this.processReadEvent();
                     if (!ok) {
@@ -154,6 +199,9 @@ public class HAConnection {
             return ReadSocketService.class.getSimpleName();
         }
 
+        /**
+         * 主节点处理从节点拉取消息请求
+         */
         private boolean processReadEvent() {
             int readSizeZeroTimes = 0;
 
@@ -169,6 +217,7 @@ public class HAConnection {
                         readSizeZeroTimes = 0;
                         this.lastReadTimestamp = HAConnection.this.haService.getDefaultMessageStore().getSystemClock().now();
                         if ((this.byteBufferRead.position() - this.processPosition) >= 8) {
+                            // 收到从节点拉取消息的请求
                             int pos = this.byteBufferRead.position() - (this.byteBufferRead.position() % 8);
                             long readOffset = this.byteBufferRead.getLong(pos - 8);
                             this.processPosition = pos;
@@ -184,11 +233,12 @@ public class HAConnection {
                                         HAConnection.this.haService.getDefaultMessageStore().getMaxPhyOffset());
                                 return false;
                             }
-
+                            // 通知处理结果
                             HAConnection.this.haService.notifyTransferSome(HAConnection.this.slaveAckOffset);
                         }
                     } else if (readSize == 0) {
                         if (++readSizeZeroTimes >= 3) {
+                            // 连续3次没有读到数据，结束
                             break;
                         }
                     } else {
@@ -205,15 +255,42 @@ public class HAConnection {
         }
     }
 
+    /**
+     * 高可用主节点网络写实现类
+     */
     class WriteSocketService extends ServiceThread {
+        /**
+         * NIO 事件选择器
+         */
         private final Selector selector;
+        /**
+         * 网络传输通道
+         */
         private final SocketChannel socketChannel;
 
+        /**
+         * 消息头长度
+         */
         private final int headerSize = 8 + 4;
+        /**
+         * 消息头缓存区
+         */
         private final ByteBuffer byteBufferHeader = ByteBuffer.allocate(headerSize);
+        /**
+         * 下一次传输的物理偏移量
+         */
         private long nextTransferFromWhere = -1;
+        /**
+         * 根据偏移量查找消息的结果
+         */
         private SelectMappedBufferResult selectMappedBufferResult;
+        /**
+         * 上一次数据是否传输完毕
+         */
         private boolean lastWriteOver = true;
+        /**
+         * 上次写入消息的时间戳
+         */
         private long lastWriteTimestamp = System.currentTimeMillis();
 
         public WriteSocketService(final SocketChannel socketChannel) throws IOException {
@@ -232,6 +309,7 @@ public class HAConnection {
                     this.selector.select(1000);
 
                     if (-1 == HAConnection.this.slaveRequestOffset) {
+                        // 主节点还未收到从节点的拉取请求
                         Thread.sleep(10);
                         continue;
                     }
@@ -281,7 +359,7 @@ public class HAConnection {
                         if (!this.lastWriteOver)
                             continue;
                     }
-
+                    // 待同步数据
                     SelectMappedBufferResult selectResult =
                         HAConnection.this.haService.getDefaultMessageStore().getCommitLogData(this.nextTransferFromWhere);
                     if (selectResult != null) {
@@ -302,7 +380,7 @@ public class HAConnection {
                         this.byteBufferHeader.putLong(thisOffset);
                         this.byteBufferHeader.putInt(size);
                         this.byteBufferHeader.flip();
-
+                        // 同步数据
                         this.lastWriteOver = this.transferData();
                     } else {
 
@@ -330,10 +408,15 @@ public class HAConnection {
             HAConnection.this.stopChannelAndSelector(this.socketChannel, this.selector, this.getServiceName());
         }
 
+        /**
+         * 传输数据
+         */
         private boolean transferData() throws Exception {
             int writeSizeZeroTimes = 0;
             // Write Header
+            // 头部信息
             while (this.byteBufferHeader.hasRemaining()) {
+                // 写入socket中
                 int writeSize = this.socketChannel.write(this.byteBufferHeader);
                 if (writeSize > 0) {
                     writeSizeZeroTimes = 0;
@@ -354,8 +437,10 @@ public class HAConnection {
             writeSizeZeroTimes = 0;
 
             // Write Body
+            // 消息内容
             if (!this.byteBufferHeader.hasRemaining()) {
                 while (this.selectMappedBufferResult.getByteBuffer().hasRemaining()) {
+                    //
                     int writeSize = this.socketChannel.write(this.selectMappedBufferResult.getByteBuffer());
                     if (writeSize > 0) {
                         writeSizeZeroTimes = 0;

@@ -56,23 +56,28 @@ public class DLedgerRoleChangeHandler implements DLedgerLeaderElector.RoleChange
                     switch (role) {
                         case CANDIDATE:
                             if (messageStore.getMessageStoreConfig().getBrokerRole() != BrokerRole.SLAVE) {
+                                // 选举阶段，不允许有 Leader 节点（还没投票产生）
                                 brokerController.changeToSlave(dLedgerCommitLog.getId());
                             }
                             break;
                         case FOLLOWER:
+                            // 选举完成，当前节点不是 Leader 节点
                             brokerController.changeToSlave(dLedgerCommitLog.getId());
                             break;
                         case LEADER:
                             while (true) {
                                 if (!dLegerServer.getMemberState().isLeader()) {
+                                    // 状态机还未变更
                                     succ = false;
                                     break;
                                 }
                                 if (dLegerServer.getdLedgerStore().getLedgerEndIndex() == -1) {
+                                    // 没数据转发，直接跳出循环
                                     break;
                                 }
                                 if (dLegerServer.getdLedgerStore().getLedgerEndIndex() == dLegerServer.getdLedgerStore().getCommittedIndex()
                                     && messageStore.dispatchBehindBytes() == 0) {
+                                    // 等待数据全部提交
                                     break;
                                 }
                                 Thread.sleep(100);

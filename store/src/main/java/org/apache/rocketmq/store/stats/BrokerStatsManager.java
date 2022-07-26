@@ -28,6 +28,9 @@ import org.apache.rocketmq.common.stats.MomentStatsItemSet;
 import org.apache.rocketmq.common.stats.StatsItem;
 import org.apache.rocketmq.common.stats.StatsItemSet;
 
+/**
+ * Broker 端 监控数据采集实现类
+ */
 public class BrokerStatsManager {
 
     @Deprecated public static final String QUEUE_PUT_NUMS = Stats.QUEUE_PUT_NUMS;
@@ -64,6 +67,8 @@ public class BrokerStatsManager {
 
     /**
      * read disk follow stats
+     * 服务端数据监控统计相关日志文件 stats.log
+     * 日志默认在启动进程的目录下 logs/rocketmqlogs/stats.log
      */
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.ROCKETMQ_STATS_LOGGER_NAME);
     private static final InternalLogger COMMERCIAL_LOG = InternalLoggerFactory.getLogger(LoggerName.COMMERCIAL_LOGGER_NAME);
@@ -71,7 +76,15 @@ public class BrokerStatsManager {
         "BrokerStatsThread"));
     private final ScheduledExecutorService commercialExecutor = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryImpl(
         "CommercialStatsThread"));
+    /**
+     * 核心数据结构
+     * 存储 Broker 端的统计数据，key 为统计指标（统计维度，如 TOPIC_PUT_NUMS等）
+     * value 为数据采集项的数据集合
+     */
     private final HashMap<String, StatsItemSet> statsTable = new HashMap<String, StatsItemSet>();
+    /**
+     * 集群名称
+     */
     private final String clusterName;
     private final boolean enableQueueStat;
     private final MomentStatsItemSet momentStatsItemSetFallSize = new MomentStatsItemSet(Stats.GROUP_GET_FALL_SIZE, scheduledExecutorService, log);
@@ -200,6 +213,12 @@ public class BrokerStatsManager {
         this.statsTable.get(Stats.TOPIC_PUT_NUMS).addValue(topic, 1, 1);
     }
 
+    /**
+     *
+     * @param topic topic
+     * @param num 写入消息数
+     * @param times 变化次数
+     */
     public void incTopicPutNums(final String topic, int num, int times) {
         this.statsTable.get(Stats.TOPIC_PUT_NUMS).addValue(topic, num, times);
     }

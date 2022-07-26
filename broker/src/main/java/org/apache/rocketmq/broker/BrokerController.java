@@ -253,7 +253,9 @@ public class BrokerController {
                     new DefaultMessageStore(this.messageStoreConfig, this.brokerStatsManager, this.messageArrivingListener,
                         this.brokerConfig);
                 if (messageStoreConfig.isEnableDLegerCommitLog()) {
+                    // 角色变更事件处理器
                     DLedgerRoleChangeHandler roleChangeHandler = new DLedgerRoleChangeHandler(this, (DefaultMessageStore) messageStore);
+                    // 在DLedger中注册
                     ((DLedgerCommitLog)((DefaultMessageStore) messageStore).getCommitLog()).getdLedgerServer().getdLedgerLeaderElector().addRoleChangeHandler(roleChangeHandler);
                 }
                 this.brokerStats = new BrokerStats((DefaultMessageStore) this.messageStore);
@@ -266,7 +268,7 @@ public class BrokerController {
                 log.error("Failed to initialize", e);
             }
         }
-
+        // 加载存储文件
         result = result && this.messageStore.load();
 
         if (result) {
@@ -352,6 +354,7 @@ public class BrokerController {
             final long period = 1000 * 60 * 60 * 24;
             this.scheduledExecutorService.scheduleAtFixedRate(() -> {
                 try {
+                    // Broker 统计数据
                     BrokerController.this.getBrokerStats().record();
                 } catch (Throwable e) {
                     log.error("schedule record error.", e);
@@ -360,6 +363,7 @@ public class BrokerController {
 
             this.scheduledExecutorService.scheduleAtFixedRate(() -> {
                 try {
+                    // 消费进度持久化
                     BrokerController.this.consumerOffsetManager.persist();
                 } catch (Throwable e) {
                     log.error("schedule persist consumerOffset error.", e);
@@ -478,6 +482,7 @@ public class BrokerController {
                 }
             }
             initialTransaction();
+            // ACL 初始化
             initialAcl();
             initialRpcHooks();
         }
@@ -504,7 +509,8 @@ public class BrokerController {
             log.info("The broker dose not enable acl");
             return;
         }
-
+        // 配置固定有一个实现类
+        // load会触发构造函数
         List<AccessValidator> accessValidators = ServiceProvider.load(ServiceProvider.ACL_VALIDATOR_ID, AccessValidator.class);
         if (accessValidators == null || accessValidators.isEmpty()) {
             log.info("The broker dose not load the AccessValidator");
@@ -950,12 +956,14 @@ public class BrokerController {
             this.brokerConfig.getBrokerName(),
             this.brokerConfig.getBrokerId(),
             this.brokerConfig.getRegisterBrokerTimeoutMills())) {
+            // 注册 broker
             doRegisterBrokerAll(checkOrderConfig, oneway, topicConfigWrapper);
         }
     }
 
     private void doRegisterBrokerAll(boolean checkOrderConfig, boolean oneway,
         TopicConfigSerializeWrapper topicConfigWrapper) {
+        // 注册
         List<RegisterBrokerResult> registerBrokerResultList = this.brokerOuterAPI.registerBrokerAll(
             this.brokerConfig.getBrokerClusterName(),
             this.getBrokerAddr(),
@@ -991,10 +999,12 @@ public class BrokerController {
         final int timeoutMills) {
 
         TopicConfigSerializeWrapper topicConfigWrapper = this.getTopicConfigManager().buildTopicConfigSerializeWrapper();
+        // 发送 dataVersion 与NameServer中比对，判断是否变更
         List<Boolean> changeList = brokerOuterAPI.needRegister(clusterName, brokerAddr, brokerName, brokerId, topicConfigWrapper, timeoutMills);
         boolean needRegister = false;
         for (Boolean changed : changeList) {
             if (changed) {
+                // 如果 broker 配置有变化，则需要重新注册
                 needRegister = true;
                 break;
             }
@@ -1133,11 +1143,17 @@ public class BrokerController {
         return accessValidatorMap;
     }
 
+    /**
+     * 节点切换为 Follower 后执行
+     * @param role
+     */
     private void handleSlaveSynchronize(BrokerRole role) {
         if (role == BrokerRole.SLAVE) {
             if (null != slaveSyncFuture) {
+                // 状态切换前的同步尚未完成，取消该同步
                 slaveSyncFuture.cancel(false);
             }
+            // 主节点地址设置为空，等待主节点心跳包重新设置主节点地址信息
             this.slaveSynchronize.setMasterAddr(null);
             slaveSyncFuture = this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
                 @Override
@@ -1153,16 +1169,22 @@ public class BrokerController {
         } else {
             //handle the slave synchronise
             if (null != slaveSyncFuture) {
+                // 该同步仅限从节点运行，元数据主节点为标准，无须同步
                 slaveSyncFuture.cancel(false);
             }
             this.slaveSynchronize.setMasterAddr(null);
         }
     }
 
+    /**
+     * 节点切换为从节点
+     * @param brokerId
+     */
     public void changeToSlave(int brokerId) {
         log.info("Begin to change to slave brokerName={} brokerId={}", brokerConfig.getBrokerName(), brokerId);
 
         //change the role
+        // 如果是配置文件中的主节点状态切换，则id设置为1，否则根据配置文件中设置来
         brokerConfig.setBrokerId(brokerId == 0 ? 1 : brokerId); //TO DO check
         messageStoreConfig.setBrokerRole(BrokerRole.SLAVE);
 
@@ -1184,6 +1206,7 @@ public class BrokerController {
         handleSlaveSynchronize(BrokerRole.SLAVE);
 
         try {
+            // 通知集群
             this.registerBrokerAll(true, true, true);
         } catch (Throwable ignored) {
 
@@ -1199,11 +1222,13 @@ public class BrokerController {
         }
         log.info("Begin to change to master brokerName={}", brokerConfig.getBrokerName());
 
+        // 元数据同步关闭
         //handle the slave synchronise
         handleSlaveSynchronize(role);
 
         //handle the scheduled service
         try {
+            // 开启定时任务处理线程（延时数据处理）
             this.messageStore.handleScheduleMessageService(role);
         } catch (Throwable t) {
             log.error("[MONITOR] handleScheduleMessageService failed when changing to master", t);
@@ -1211,16 +1236,19 @@ public class BrokerController {
 
         //handle the transactional service
         try {
+            // 开启事务状态回查处理线程
             this.startProcessorByHa(BrokerRole.SYNC_MASTER);
         } catch (Throwable t) {
             log.error("[MONITOR] startProcessorByHa failed when changing to master", t);
         }
 
         //if the operations above are totally successful, we change to master
+        // 主节点id
         brokerConfig.setBrokerId(0); //TO DO check
         messageStoreConfig.setBrokerRole(role);
 
         try {
+            // 通知集群（NameServer）
             this.registerBrokerAll(true, true, true);
         } catch (Throwable ignored) {
 
@@ -1228,6 +1256,11 @@ public class BrokerController {
         log.info("Finish to change to master brokerName={}", brokerConfig.getBrokerName());
     }
 
+    /**
+     * 开启事务状态，回查处理器
+     * 当节点状态切换为 Leader 时，需开启对应的事务状态回查处理器，对 PREPARE 状态的消息发起事务状态回查请求
+     * @param role
+     */
     private void startProcessorByHa(BrokerRole role) {
         if (BrokerRole.SLAVE != role) {
             if (this.transactionalMessageCheckService != null) {

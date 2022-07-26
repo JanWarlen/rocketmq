@@ -1,3 +1,83 @@
+
+## NameServer
+### 启动
+#### 启动入口
+`org.apache.rocketmq.namesrv.NamesrvStartup.main`
+### 运行
+#### 处理转发请求入口
+会根据不同的业务转发到不同的逻辑代码
+`org.apache.rocketmq.namesrv.processor.DefaultRequestProcessor.processRequest`
+#### 注册Broker入口
+`org.apache.rocketmq.namesrv.processor.DefaultRequestProcessor.registerBrokerWithFilterServer`
+`org.apache.rocketmq.namesrv.processor.DefaultRequestProcessor.registerBroker`
+
+## Broker
+### 启动
+#### Broker启动入口
+`org.apache.rocketmq.broker.BrokerStartup.main`
+#### Broker启动加载文件入口
+`org.apache.rocketmq.store.DefaultMessageStore.load`
+#### 定时消息线程启动入口
+`org.apache.rocketmq.store.DefaultMessageStore.handleScheduleMessageService`
+#### acl初始化入口
+`org.apache.rocketmq.broker.BrokerController.initialAcl`
+### 运行
+#### 处理请求入口
+`org.apache.rocketmq.remoting.netty.NettyRemotingAbstract.processRequestCommand`
+##### 处理拉取消息请求入口
+`org.apache.rocketmq.broker.processor.PullMessageProcessor.processRequest(io.netty.channel.ChannelHandlerContext, org.apache.rocketmq.remoting.protocol.RemotingCommand)`
+###### 消息拉取长轮询入口
+正常的客户端拉取请求未拉取到数据`ResponseCode.PULL_NOT_FOUND`，则会添加一个`pullRequest`
+`org.apache.rocketmq.broker.longpolling.PullRequestHoldService.run`
+##### 更新消费进入请求入口
+`org.apache.rocketmq.broker.processor.ConsumerManageProcessor.updateConsumerOffset`
+#### 根据CommitLog生成ConsumeQueue和Index入口
+`org.apache.rocketmq.store.DefaultMessageStore.ReputMessageService.doReput`
+#### 心跳发送入口
+broker定时心跳在`org.apache.rocketmq.broker.BrokerController.start`中启动定时任务执行
+#### 注册到 NameServer 入口
+`org.apache.rocketmq.broker.BrokerController.registerBrokerAll`
+#### 处理Producer发送消息入口
+`org.apache.rocketmq.broker.processor.SendMessageProcessor.asyncProcessRequest(io.netty.channel.ChannelHandlerContext, org.apache.rocketmq.remoting.protocol.RemotingCommand, org.apache.rocketmq.remoting.netty.RemotingResponseCallback)`
+### 主从同步（非DLedger）
+#### 提交同步请求入口
+`org.apache.rocketmq.store.CommitLog.submitReplicaRequest`
+#### 初始化入口
+`org.apache.rocketmq.store.ha.HAService.HAService`
+在构建HAService对象时
++ 创建`AcceptSocketService`对象，其主要功能职责是创建Socket端口与Slave连接
++ 创建`GroupTransferService`对象，其主要功能职责是接收同步复制数据请求CommitLog.GroupCommitRequest，等待处理结果，并触发org.apache.rocketmq.store.CommitLog.GroupCommitRequest.wakeupCustomer
++ 创建`HAClient`对象，其主要功能职责是与主节点连接，同步文件传输和偏移量上报
+#### 主节点创建传输请求入口
+`org.apache.rocketmq.store.ha.HAService.GroupTransferService.doWaitTransfer`
+#### 从节点读取数据处理入口
+`org.apache.rocketmq.store.ha.HAService.HAClient.dispatchReadRequest`
+### 监控
+#### 监控统计核心类
+`org.apache.rocketmq.store.stats.BrokerStatsManager`
+#### topic写入消息数统计代码
+`org.apache.rocketmq.broker.processor.SendMessageProcessor.handlePutMessageResult`
+
+## Client(客户端)
+### Producer
+#### 启动入口
+`org.apache.rocketmq.client.producer.DefaultMQProducer.start`
+#### 消息发送入口
+`org.apache.rocketmq.client.producer.DefaultMQProducer.send(org.apache.rocketmq.common.message.Message)`
+
+### Consumer
+#### 启动入口
+`org.apache.rocketmq.client.consumer.DefaultMQPushConsumer.start`
+#### 发送拉取消息请求入口
+`org.apache.rocketmq.client.impl.consumer.PullMessageService.run`
+#### 负载均衡入口
+`org.apache.rocketmq.client.impl.consumer.RebalanceService.run`
+
+
+
+
+
+
 ## Apache RocketMQ 
 [![Build Status](https://travis-ci.org/apache/rocketmq.svg?branch=master)](https://travis-ci.org/apache/rocketmq) [![Coverage Status](https://coveralls.io/repos/github/apache/rocketmq/badge.svg?branch=master)](https://coveralls.io/github/apache/rocketmq?branch=master)
 [![CodeCov](https://codecov.io/gh/apache/rocketmq/branch/master/graph/badge.svg)](https://codecov.io/gh/apache/rocketmq)

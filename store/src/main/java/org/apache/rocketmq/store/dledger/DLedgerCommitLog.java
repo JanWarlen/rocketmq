@@ -67,46 +67,90 @@ public class DLedgerCommitLog extends CommitLog {
         System.setProperty("dLedger.multiPath.Splitter", MessageStoreConfig.MULTI_PATH_SPLITTER);
     }
 
+    /**
+     * 集群的一个节点，当前节点
+     */
     private final DLedgerServer dLedgerServer;
+    /**
+     * 配置信息
+     */
     private final DLedgerConfig dLedgerConfig;
+    /**
+     * 基于文件映射的存储实现
+     */
     private final DLedgerMmapFileStore dLedgerFileStore;
+    /**
+     * 存储文件集合，对标 RocketMQ 中的 MappedFileQueue
+     */
     private final MmapFileList dLedgerFileList;
 
     //The id identifies the broker role, 0 means master, others means slave
+    /**
+     * 节点id，0为 Leader节点，非0 为从节点
+     */
     private final int id;
 
+    /**
+     * 消息序列化工具
+     */
     private final MessageSerializer messageSerializer;
+    /**
+     * 用于计算消息追加的耗时，该属性记录获取锁的时间戳
+     */
     private volatile long beginTimeInDledgerLock = 0;
 
     //This offset separate the old commitlog from dledger commitlog
+    /**
+     * 记录旧的 CommitLog 文件中的最大偏移量，超过该值的访问才会访问 DLedger 管理的文件
+     */
     private long dividedCommitlogOffset = -1;
 
+    /**
+     * 是否正在恢复旧 Commitlog
+     */
     private boolean isInrecoveringOldCommitlog = false;
 
+    /**
+     *
+     */
     private final StringBuilder msgIdBuilder = new StringBuilder();
 
     public DLedgerCommitLog(final DefaultMessageStore defaultMessageStore) {
         super(defaultMessageStore);
         dLedgerConfig = new DLedgerConfig();
+        // 是否允许强制删除文件， 默认 true
         dLedgerConfig.setEnableDiskForceClean(defaultMessageStore.getMessageStoreConfig().isCleanFileForciblyEnable());
+        // 默认为基于文件的存储模式
         dLedgerConfig.setStoreType(DLedgerConfig.FILE);
+        // 节点ID
         dLedgerConfig.setSelfId(defaultMessageStore.getMessageStoreConfig().getdLegerSelfId());
+        //
         dLedgerConfig.setGroup(defaultMessageStore.getMessageStoreConfig().getdLegerGroup());
+        // group 内所有节点信息
         dLedgerConfig.setPeers(defaultMessageStore.getMessageStoreConfig().getdLegerPeers());
+        // DLedger 日志文件根目录
         dLedgerConfig.setStoreBaseDir(defaultMessageStore.getMessageStoreConfig().getStorePathRootDir());
+        // DLedger CommitLog 存储路径
         dLedgerConfig.setDataStorePath(defaultMessageStore.getMessageStoreConfig().getStorePathDLedgerCommitLog());
+        //
         dLedgerConfig.setReadOnlyDataStoreDirs(defaultMessageStore.getMessageStoreConfig().getReadOnlyCommitLogStorePaths());
+        // 单个日志文件的大小限制
         dLedgerConfig.setMappedFileSizeForEntryData(defaultMessageStore.getMessageStoreConfig().getMappedFileSizeCommitLog());
+        // 日志文件的定期删除过期日志的时间
         dLedgerConfig.setDeleteWhen(defaultMessageStore.getMessageStoreConfig().getDeleteWhen());
+        // 日志文件保留时间
         dLedgerConfig.setFileReservedHours(defaultMessageStore.getMessageStoreConfig().getFileReservedTime() + 1);
         dLedgerConfig.setPreferredLeaderId(defaultMessageStore.getMessageStoreConfig().getPreferredLeaderId());
+        // 是否批量推
         dLedgerConfig.setEnableBatchPush(defaultMessageStore.getMessageStoreConfig().isEnableBatchPush());
+        // 检测过期日志的磁盘阈值
         dLedgerConfig.setDiskSpaceRatioToCheckExpired(defaultMessageStore.getMessageStoreConfig().getDiskMaxUsedSpaceRatio() / 100f);
 
         id = Integer.parseInt(dLedgerConfig.getSelfId().substring(1)) + 1;
         dLedgerServer = new DLedgerServer(dLedgerConfig);
         dLedgerFileStore = (DLedgerMmapFileStore) dLedgerServer.getdLedgerStore();
         DLedgerMmapFileStore.AppendHook appendHook = (entry, buffer, bodyOffset) -> {
+            // 启用了主从切换机制，消息追加时返回的物理偏移量不是 DLedger 日志的起始位置，而是body字段的起始位置（RocketMQ 将日志写在 DLedger 日志的body里）
             assert bodyOffset == DLedgerEntry.BODY_OFFSET;
             buffer.position(buffer.position() + bodyOffset + MessageDecoder.PHY_POS_POSITION);
             buffer.putLong(entry.getPos() + bodyOffset);
@@ -128,6 +172,10 @@ public class DLedgerCommitLog extends CommitLog {
         dLedgerConfig.setFileReservedHours(defaultMessageStore.getMessageStoreConfig().getFileReservedTime() + 1);
     }
 
+    /**
+     * 禁止强制删除文件
+     * 文件保留时间设置为 10年
+     */
     private void disableDeleteDledger() {
         dLedgerConfig.setEnableDiskForceClean(false);
         dLedgerConfig.setFileReservedHours(24 * 365 * 10);
@@ -271,16 +319,23 @@ public class DLedgerCommitLog extends CommitLog {
     private void recover(long maxPhyOffsetOfConsumeQueue) {
         dLedgerFileStore.load();
         if (dLedgerFileList.getMappedFiles().size() > 0) {
+            // 存在 DLedger 日志文件
             dLedgerFileStore.recover();
+            // DLedger 日志文件中的起始偏移量
             dividedCommitlogOffset = dLedgerFileList.getFirstMappedFile().getFileFromOffset();
             MappedFile mappedFile = this.mappedFileQueue.getLastMappedFile();
             if (mappedFile != null) {
+                // 存在旧的 CommitLog 文件
+                // 禁止删除是为了防止出现偏移量断层，无法连续访问
+                // 但是存在磁盘风险
                 disableDeleteDledger();
             }
             long maxPhyOffset = dLedgerFileList.getMaxWrotePosition();
             // Clear ConsumeQueue redundant data
             if (maxPhyOffsetOfConsumeQueue >= maxPhyOffset) {
+                // CommitQueue 中存储的最大物理偏移量大于 DLedger 中最大的物理偏移量
                 log.warn("[TruncateCQ]maxPhyOffsetOfConsumeQueue({}) >= processOffset({}), truncate dirty logic files", maxPhyOffsetOfConsumeQueue, maxPhyOffset);
+                // 删除 CommitQueue 中多余部分（大于 DLedger 中最大的物理偏移量 的部分删除）
                 this.defaultMessageStore.truncateDirtyLogicFiles(maxPhyOffset);
             }
             return;
@@ -292,6 +347,7 @@ public class DLedgerCommitLog extends CommitLog {
         isInrecoveringOldCommitlog = false;
         MappedFile mappedFile = this.mappedFileQueue.getLastMappedFile();
         if (mappedFile == null) {
+            // 无 旧的CommitLog
             return;
         }
         ByteBuffer byteBuffer = mappedFile.sliceByteBuffer();
@@ -314,6 +370,7 @@ public class DLedgerCommitLog extends CommitLog {
             byteBuffer.putInt(BLANK_MAGIC_CODE);
             mappedFile.flush(0);
         }
+        // 该文件已经完结，后续将写入 DLedger 日志文件
         mappedFile.setWrotePosition(mappedFile.getFileSize());
         mappedFile.setCommittedPosition(mappedFile.getFileSize());
         mappedFile.setFlushedPosition(mappedFile.getFileSize());
@@ -466,10 +523,12 @@ public class DLedgerCommitLog extends CommitLog {
             request.setGroup(dLedgerConfig.getGroup());
             request.setRemoteId(dLedgerServer.getMemberState().getSelfId());
             request.setBody(encodeResult.getData());
+            // DLedger 写入日志
             dledgerFuture = (AppendFuture<AppendEntryResponse>) dLedgerServer.handleAppend(request);
             if (dledgerFuture.getPos() == -1) {
                 return CompletableFuture.completedFuture(new PutMessageResult(PutMessageStatus.OS_PAGECACHE_BUSY, new AppendMessageResult(AppendMessageStatus.UNKNOWN_ERROR)));
             }
+            // 因为 rocketmq是将 rocketmq的日志 写在 DLedger 日志中body里，所以偏移量需要额外计算
             long wroteOffset = dledgerFuture.getPos() + DLedgerEntry.BODY_OFFSET;
 
             int msgIdLength = (msg.getSysFlag() & MessageSysFlag.STOREHOSTADDRESS_V6_FLAG) == 0 ? 4 + 4 + 8 : 16 + 4 + 8;
@@ -663,6 +722,7 @@ public class DLedgerCommitLog extends CommitLog {
     @Override
     public SelectMappedBufferResult getMessage(final long offset, final int size) {
         if (offset < dividedCommitlogOffset) {
+            // 偏移量小于 DLedger 日志文件的起始偏移量，直接从 RocketMQ的 CommitLog 文件中找
             return super.getMessage(offset, size);
         }
         int mappedFileSize = this.dLedgerServer.getdLedgerConfig().getMappedFileSizeForEntryData();

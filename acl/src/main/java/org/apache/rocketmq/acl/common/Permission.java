@@ -45,13 +45,23 @@ public class Permission {
         ADMIN_CODE.add(RequestCode.DELETE_SUBSCRIPTIONGROUP);
     }
 
+    /**
+     *
+     * @param neededPerm 待校验
+     * @param ownedPerm 已配置
+     * @return 结果
+     */
     public static boolean checkPermission(byte neededPerm, byte ownedPerm) {
         if ((ownedPerm & DENY) > 0) {
+            // 默认权限是 DENY
             return false;
         }
         if ((neededPerm & ANY) > 0) {
+            // 待校验权限是任意
+            // 配置的是订阅or发送权限
             return ((ownedPerm & PUB) > 0) || ((ownedPerm & SUB) > 0);
         }
+        // 请求权限和配置权限相同
         return (neededPerm & ownedPerm) > 0;
     }
 

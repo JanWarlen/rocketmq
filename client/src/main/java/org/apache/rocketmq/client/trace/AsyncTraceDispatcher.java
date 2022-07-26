@@ -54,25 +54,64 @@ public class AsyncTraceDispatcher implements TraceDispatcher {
 
     private final static InternalLogger log = ClientLogger.getLog();
     private final static AtomicInteger COUNTER = new AtomicInteger();
+    /**
+     * 异步转发队列长度，默认2048
+     */
     private final int queueSize;
+    /**
+     * 批量消息条数，默认100
+     * 消息轨迹一次消息发送请求包含的数据条数
+     */
     private final int batchSize;
+    /**
+     * 消息轨迹一次发送的最大消息大小，默认 128KB
+     */
     private final int maxMsgSize;
     private final long pollingTimeMil;
     private final long waitTimeThresholdMil;
+    /**
+     * 用来发送消息轨迹的消息发送者
+     */
     private final DefaultMQProducer traceProducer;
+    /**
+     * 异步执行消息发送线程池
+     */
     private final ThreadPoolExecutor traceExecutor;
     // The last discard number of log
+    /**
+     * 记录丢弃的消息个数
+     */
     private AtomicLong discardCount;
+    /**
+     * 工作线程
+     * 主要负责从追加队列中获取一批待发送的消息轨迹数据，将其提交到线程池中执行
+     */
     private Thread worker;
+    /**
+     * 消息轨迹 TraceContext 队列，用来存放待发送到服务端的消息
+     */
     private final ArrayBlockingQueue<TraceContext> traceContextQueue;
+    /**
+     * 发送任务等待队列
+     */
     private final HashMap<String, TraceDataSegment> taskQueueByTopic;
+    /**
+     * 线程池内部队列，默认长度1024
+     */
     private ArrayBlockingQueue<Runnable> appenderQueue;
     private volatile Thread shutDownHook;
     private volatile boolean stopped = false;
     private DefaultMQProducerImpl hostProducer;
+    /**
+     * 消费者信息
+     * 记录消息消费时的轨迹信息
+     */
     private DefaultMQPushConsumerImpl hostConsumer;
     private volatile ThreadLocalIndex sendWhichQueue = new ThreadLocalIndex();
     private String dispatcherId = UUID.randomUUID().toString();
+    /**
+     * 用于跟踪消息轨迹的 topic 名称
+     */
     private volatile String traceTopicName;
     private AtomicBoolean isStarted = new AtomicBoolean(false);
     private volatile AccessChannel accessChannel = AccessChannel.LOCAL;
@@ -359,6 +398,9 @@ public class AsyncTraceDispatcher implements TraceDispatcher {
     }
 
 
+    /**
+     * 异步轨迹发送任务
+     */
     class AsyncDataSendTask implements Runnable {
         private final String traceTopicName;
         private final String regionId;
@@ -393,6 +435,7 @@ public class AsyncTraceDispatcher implements TraceDispatcher {
             // Keyset of message trace includes msgId of or original message
             message.setKeys(keySet);
             try {
+                // 获取轨迹存储brokerName集合
                 Set<String> traceBrokerSet = tryGetMessageQueueBrokerSet(traceProducer.getDefaultMQProducerImpl(), traceTopic);
                 SendCallback callback = new SendCallback() {
                     @Override
@@ -412,6 +455,7 @@ public class AsyncTraceDispatcher implements TraceDispatcher {
                     traceProducer.send(message, new MessageQueueSelector() {
                         @Override
                         public MessageQueue select(List<MessageQueue> mqs, Message msg, Object arg) {
+                            // brokerName 集合
                             Set<String> brokerSet = (Set<String>) arg;
                             List<MessageQueue> filterMqs = new ArrayList<MessageQueue>();
                             for (MessageQueue queue : mqs) {
@@ -419,6 +463,7 @@ public class AsyncTraceDispatcher implements TraceDispatcher {
                                     filterMqs.add(queue);
                                 }
                             }
+                            // 队列均衡
                             int index = sendWhichQueue.incrementAndGet();
                             int pos = Math.abs(index) % filterMqs.size();
                             if (pos < 0) {

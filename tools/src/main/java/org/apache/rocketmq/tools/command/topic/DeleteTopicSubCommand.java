@@ -17,6 +17,7 @@
 package org.apache.rocketmq.tools.command.topic;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.commons.cli.CommandLine;
@@ -38,8 +39,9 @@ public class DeleteTopicSubCommand implements SubCommand {
         final String topic
     ) throws InterruptedException, MQBrokerException, RemotingException, MQClientException {
 
-        Set<String> brokerAddressSet = CommandUtil.fetchMasterAndSlaveAddrByClusterName(adminExt, clusterName);
-        adminExt.deleteTopicInBroker(brokerAddressSet, topic);
+        Set<String> masterBrokerAddressSet = CommandUtil.fetchMasterAddrByClusterName(adminExt, clusterName);
+        System.out.println("brokerAddressSet:"+ Arrays.toString(masterBrokerAddressSet.toArray()));
+        adminExt.deleteTopicInBroker(masterBrokerAddressSet, topic);
         System.out.printf("delete topic [%s] from cluster [%s] success.%n", topic, clusterName);
 
         Set<String> nameServerSet = null;
